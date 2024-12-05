@@ -15,10 +15,10 @@ def generate_response(question, system_prompt=None):
 
     response = model.predict(
         prompt,
-        temperature=0.2,  # 生成のランダム性を調整 (0.0 ~ 1.0)
+        temperature=0.2,  # 高いほど確率分布が尖鋭化する (0.0 ~ 2.0)
         max_output_tokens=256,  # 生成されるトークン数の上限
-        top_p=0.8,  # 生成されるトークンの多様性を調整 (0.0 ~ 1.0)
-        top_k=40,  # 生成されるトークンの上位 k 個を選択
+        top_p=0.8,  # 多様性を調整 (0.0 ~ 1.0)
+        top_k=40,  # トークンの上位k個を選択
     )
 
     return response.text
