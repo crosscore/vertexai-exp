@@ -23,14 +23,7 @@ def generate_response(question, system_prompt=None):
 
     return response.text
 
-# システムプロンプトの例
 system_prompt = "あなたは優秀なアシスタントです。質問に丁寧に答えてください。"
-
-# ユーザーからの質問の例
 question = "今日の天気は？"
-
-# 回答の生成
 response = generate_response(question, system_prompt)
-
-# 回答の出力
 print(response)
