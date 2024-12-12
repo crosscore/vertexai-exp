@@ -1,7 +1,7 @@
 from vertexai.preview.generative_models import GenerativeModel
 
-#PROJECT_ID = "business-test-001"
-#REGION = "us-central1"
+#PROJECT_ID = "project_id"
+#REGION = "region"
 #vertexai.init(project=PROJECT_ID, location=REGION)
 
 generative_multimodal_model = GenerativeModel("gemini-1.5-flash-002")
