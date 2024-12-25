@@ -1,6 +1,6 @@
 from vertexai.preview.generative_models import GenerativeModel
 from typing import List, Dict, Optional
-from agent_search import search_sample
+from agent_search_from_engine import search_sample
 from dotenv import load_dotenv
 import os
 
