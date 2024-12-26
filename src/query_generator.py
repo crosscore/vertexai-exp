@@ -2,14 +2,7 @@ from vertexai.preview.generative_models import GenerativeModel
 from typing import Optional
 from table_selector import TableSelector
 from agent_search_from_engine import search_sample
-from dotenv import load_dotenv
-import os
-
-load_dotenv()
-LOCATION = os.getenv("LOCATION")
-PROJECT_ID = os.getenv("PROJECT_ID")
-ENGINE_ID = os.getenv("ENGINE_ID")
-
+from query_logger import QueryLogger
 
 class QueryGenerator:
     """
@@ -30,26 +23,27 @@ class QueryGenerator:
 
         Args:
             question: User's original question
-            table_info: Information about the selected table including schema
+            table_info: Information about the selected table including schema and time range
 
         Returns:
             Formatted prompt string
         """
         prompt = f"""
 あなたはSQLクエリを生成する専門家です。
-以下の情報を基に、ユーザーの質問に答えるために必要なSQLクエリを生成してください。
+以下の情報を基に、ユーザーの質問に答えるために必要なSQLクエリを生成して下さい。
 
-ユーザーの質問: {question}
+ユーザーの質問:
+{question}
 
 対象テーブルの情報:
 {table_info}
 
-以下の要件に従ってSQLクエリを生成してください：
-1. SELECT句には質問に関連するカラムのみを含めてください
-2. 回答には生のSQLクエリのみを含めてください（説明や理由は不要です）
-3. クエリは簡潔で効率的なものにしてください
-4. 必要に応じてWHERE句やJOIN句を使用してください
-5. 集計が必要な場合はGROUP BY句を使用してください
+以下の要件に従ってSQLクエリを生成して下さい:
+1. SELECT句には質問に関連するカラムのみを含める。
+2. 回答には生のSQLクエリのみを含める。 (説明や理由は一切不要です)
+3. クエリは簡潔で効率的なものにする。
+4. 必要に応じてWHERE句やJOIN句を使用する。
+5. 集計が必要な場合はGROUP BY句を使用する。
 
 SQLクエリ:
 """
@@ -112,44 +106,106 @@ def get_table_info(search_results: list, table_id: str) -> Optional[str]:
 
 def main():
     """
-    Example usage of QueryGenerator
+    Process multiple questions and generate SQL queries
     """
     # Configuration
-    project_id = PROJECT_ID
-    location = LOCATION
-    engine_id = ENGINE_ID
-    search_query = "商品の在庫数を知りたい"
+    project_id = "business-test-001"
+    location = "global"
+    engine_id = "test-agent-app_1735199159695"
+
+    # List of questions to process
+    questions = [
+        "商品の在庫数を知りたい",
+        "テーブルの全期間の商品の在庫数の推移のグラフを作成して下さい",
+        "直近1週間の商品カテゴリー別の在庫数を教えて下さい",
+        "在庫数が10個未満の商品を抽出して下さい",
+        "商品別の在庫数の平均値を計算して下さい"
+    ]
+
+    # Initialize counters and error tracking
+    total_questions = len(questions)
+    successful_queries = 0
+    failed_questions = []
 
     try:
-        # Execute search
-        results = search_sample(project_id, location, engine_id, search_query)
+        from tqdm import tqdm
+        questions_iterator = tqdm(enumerate(questions, 1), total=total_questions, desc="Processing questions")
+    except ImportError:
+        print("tqdm not installed. Using standard iteration.")
+        questions_iterator = enumerate(questions, 1)
 
-        # Get table recommendation
-        selector = TableSelector()
-        selected_table = selector.select_table(search_query, results)
+    for i, question in questions_iterator:
+        print(f"\n{'='*50}")
+        print(f"処理開始: 質問 {i}/{total_questions}")
+        print(f"質問内容: {question}")
+        print(f"{'='*50}\n")
 
-        if not selected_table:
-            print("\n適切なテーブルが見つかりませんでした。")
-            return
+        try:
+            # Execute search
+            results = search_sample(project_id, location, engine_id, question)
 
-        # Get table information
-        table_info = get_table_info(results, selected_table)
-        if not table_info:
-            print(f"\nテーブル情報が見つかりませんでした: {selected_table}")
-            return
+            print("\n=== 検索結果 ===")
+            for idx, result in enumerate(results, 1):
+                print(f"\n[上位{idx}件目]")
+                print(result['content'])
+                print("-" * 30)
 
-        # Generate SQL query
-        generator = QueryGenerator()
-        sql_query = generator.generate_query(search_query, table_info)
+            # Get table recommendation
+            selector = TableSelector()
+            selected_table = selector.select_table(question, results)
 
-        if sql_query:
-            print("\n=== 生成されたSQLクエリ ===")
-            print(sql_query)
-        else:
-            print("\nSQLクエリの生成に失敗しました。")
+            if not selected_table:
+                print("\n適切なテーブルが見つかりませんでした。")
+                failed_questions.append((i, question, "テーブル選択失敗"))
+                continue
 
-    except Exception as e:
-        print(f"エラーが発生しました: {str(e)}")
+            # Get table information
+            table_info = get_table_info(results, selected_table)
+            if not table_info:
+                print(f"\nテーブル情報が見つかりませんでした: {selected_table}")
+                failed_questions.append((i, question, "テーブル情報取得失敗"))
+                continue
+
+            # Generate SQL query
+            generator = QueryGenerator()
+            sql_query = generator.generate_query(question, table_info)
+
+            if sql_query:
+                print("\n=== 生成されたSQLクエリ ===")
+                print(sql_query)
+                successful_queries += 1
+            else:
+                print("\nSQLクエリの生成に失敗しました。")
+                failed_questions.append((i, question, "SQLクエリ生成失敗"))
+                continue
+
+            # Log the results
+            logger = QueryLogger()
+            logger.log_query(question, results, selected_table, sql_query)
+
+            print(f"\n質問 {i} の処理が完了しました。")
+
+        except Exception as e:
+            print(f"\nエラーが発生しました: {str(e)}")
+            failed_questions.append((i, question, f"エラー: {str(e)}"))
+
+    # Print summary
+    print("\n" + "="*50)
+    print("処理完了サマリー")
+    print("="*50)
+    print(f"総質問数: {total_questions}")
+    print(f"成功: {successful_queries}/{total_questions} " +
+            f"({(successful_queries/total_questions*100):.1f}%)")
+    print(f"失敗: {len(failed_questions)}/{total_questions} " +
+            f"({(len(failed_questions)/total_questions*100):.1f}%)")
+
+    if failed_questions:
+        print("\n失敗した質問の詳細:")
+        print("-"*50)
+        for idx, question, reason in failed_questions:
+            print(f"質問 {idx}: {question}")
+            print(f"理由: {reason}")
+            print("-"*30)
 
 if __name__ == "__main__":
     main()
