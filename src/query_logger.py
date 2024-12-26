@@ -4,82 +4,57 @@ from typing import List, Dict
 from pathlib import Path
 
 class QueryLogger:
-    """
-    A class to log query generation results to CSV file
-    """
     def __init__(self, csv_path: str = "./csv/query_logs.csv"):
-        """
-        Initialize QueryLogger with CSV file path
-        
-        Args:
-            csv_path: Path to the CSV file where logs will be saved
-        """
         self.csv_path = csv_path
         self._ensure_directory_exists()
 
     def _ensure_directory_exists(self):
-        """Create the directory for the CSV file if it doesn't exist"""
         directory = os.path.dirname(self.csv_path)
         if directory:
             Path(directory).mkdir(parents=True, exist_ok=True)
 
     def _format_search_results(self, search_results: List[Dict]) -> str:
-        """
-        Format search results exactly as they appear in the prompt
-        
-        Args:
-            search_results: List of search results from search_sample function
-            
-        Returns:
-            Formatted string with search results
-        """
         formatted_results = []
         for result in search_results:
             formatted_results.append(f"{result['content']}\n---")
         return '\n'.join(formatted_results).strip()
 
-    def log_query(self, 
-                  question: str, 
-                  search_results: List[Dict], 
-                  selected_table: str, 
-                  generated_sql: str):
-        """
-        Log the query generation results to CSV file
-        
-        Args:
-            question: Original user question
-            search_results: Results from search_sample function
-            selected_table: Table selected by LLM
-            generated_sql: Generated SQL query
-        """
-        # Format search results as they appear in the prompt
+    def log_query(self,
+                    question: str,
+                    search_results: List[Dict],
+                    selected_table: str,
+                    generated_sql: str,
+                    expected_table: str = None,
+                    is_correct: bool = None):
         formatted_results = self._format_search_results(search_results)
-        
-        # Prepare the row to be written
+
         row = [
             question,
             formatted_results,
             selected_table,
             generated_sql
         ]
-        
-        # Check if file exists to determine if headers need to be written
+
+        # Add test results if provided
+        if expected_table is not None:
+            row.extend([expected_table, is_correct])
+
         file_exists = os.path.isfile(self.csv_path)
-        
-        # Open file in append mode with UTF-8 encoding
+
         with open(self.csv_path, 'a', newline='', encoding='utf-8-sig') as f:
             writer = csv.writer(f)
-            
-            # Write headers if file is new
+
             if not file_exists:
-                writer.writerow([
+                headers = [
                     'ユーザーの質問',
                     '検索結果',
                     'テーブル選択結果',
                     '生成されたSQLクエリ'
-                ])
-            
-            # Write the data row
+                ]
+                if expected_table is not None:
+                    headers.extend(['期待されるテーブル', 'テーブル選択の正誤'])
+                writer.writerow(headers)
+
             writer.writerow(row)
 
 def main():
@@ -103,7 +78,7 @@ def main():
 
     # Create logger instance
     logger = QueryLogger()
-    
+
     # Log the sample data
     logger.log_query(
         sample_data['question'],
@@ -111,7 +86,7 @@ def main():
         sample_data['selected_table'],
         sample_data['generated_sql']
     )
-    
+
     print(f"Query logged successfully to {logger.csv_path}")
 
 if __name__ == "__main__":
