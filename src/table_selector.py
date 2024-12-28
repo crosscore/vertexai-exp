@@ -1,31 +1,24 @@
 from vertexai.preview.generative_models import GenerativeModel
 from typing import List, Dict, Optional
 from agent_search_from_engine import search_sample
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+PROJECT_ID = os.getenv("PROJECT_ID")
+LOCATION = os.getenv("LOCATION")
+ENGINE_ID = os.getenv("ENGINE_ID")
+MODEL_NAME = os.getenv("MODEL_NAME")
+
 
 class TableSelector:
     """
     A class to select the most relevant table using Gemini model based on search results
     """
-    def __init__(self, model_name: str = "gemini-2.0-flash-exp"):
-        """
-        Initialize the TableSelector with specified model
-
-        Args:
-            model_name: Name of the Gemini model to use
-        """
+    def __init__(self, model_name: str = MODEL_NAME):
         self.model = GenerativeModel(model_name)
 
     def _create_prompt(self, question: str, search_results: List[Dict]) -> str:
-        """
-        Create a prompt for Gemini model based on the question and search results
-
-        Args:
-            question: User's original question
-            search_results: List of search results containing table information
-
-        Returns:
-            Formatted prompt string
-        """
         prompt = f"""
 質問: {question}
 
@@ -40,16 +33,6 @@ class TableSelector:
         return prompt
 
     def select_table(self, question: str, search_results: List[Dict]) -> Optional[str]:
-        """
-        Select the most relevant table for the given question
-
-        Args:
-            question: User's original question
-            search_results: List of search results from agent_search
-
-        Returns:
-            Selected table ID or None if no table is found
-        """
         try:
             prompt = self._create_prompt(question, search_results)
             response = self.model.generate_content(prompt)
@@ -64,9 +47,9 @@ def main():
     Example usage of TableSelector
     """
     # Configuration
-    project_id = "business-test-001"
-    location = "global"
-    engine_id = "test-agent-app_1735199159695"
+    project_id = PROJECT_ID
+    location = LOCATION
+    engine_id = ENGINE_ID
     question = "商品の在庫数を知りたい"
 
     try:

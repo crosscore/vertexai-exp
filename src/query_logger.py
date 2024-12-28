@@ -2,18 +2,35 @@ import os
 import csv
 from typing import List, Dict
 from pathlib import Path
+from datetime import datetime
 
 class QueryLogger:
     def __init__(self, csv_path: str = "./csv/query_logs.csv"):
+        """
+        Initialize QueryLogger
+
+        Args:
+            csv_path: Path to the CSV log file
+        """
         self.csv_path = csv_path
         self._ensure_directory_exists()
 
     def _ensure_directory_exists(self):
+        """Ensure the output directory exists"""
         directory = os.path.dirname(self.csv_path)
         if directory:
             Path(directory).mkdir(parents=True, exist_ok=True)
 
     def _format_search_results(self, search_results: List[Dict]) -> str:
+        """
+        Format search results for CSV logging
+
+        Args:
+            search_results: List of search result dictionaries
+
+        Returns:
+            Formatted string of search results
+        """
         formatted_results = []
         for result in search_results:
             formatted_results.append(f"{result['content']}\n---")
@@ -26,36 +43,54 @@ class QueryLogger:
                     generated_sql: str,
                     expected_table: str = None,
                     is_correct: bool = None):
-        formatted_results = self._format_search_results(search_results)
+        """
+        Log query information to CSV file
 
-        row = [
-            question,
-            formatted_results,
-            selected_table,
-            generated_sql
-        ]
+        Args:
+            question: User's question
+            search_results: Search results from the engine
+            selected_table: Selected table ID
+            generated_sql: Generated SQL query
+            expected_table: Expected table ID (for testing)
+            is_correct: Whether table selection was correct (for testing)
+        """
+        try:
+            formatted_results = self._format_search_results(search_results)
 
-        # Add test results if provided
-        if expected_table is not None:
-            row.extend([expected_table, is_correct])
+            row = [
+                question,
+                formatted_results,
+                selected_table,
+                generated_sql,
+                datetime.now().isoformat()
+            ]
 
-        file_exists = os.path.isfile(self.csv_path)
+            # Add test results if provided
+            if expected_table is not None:
+                row.extend([expected_table, str(is_correct)])
 
-        with open(self.csv_path, 'a', newline='', encoding='utf-8-sig') as f:
-            writer = csv.writer(f)
+            file_exists = os.path.isfile(self.csv_path)
 
-            if not file_exists:
-                headers = [
-                    'ユーザーの質問',
-                    '検索結果',
-                    'テーブル選択結果',
-                    '生成されたSQLクエリ'
-                ]
-                if expected_table is not None:
-                    headers.extend(['期待されるテーブル', 'テーブル選択の正誤'])
-                writer.writerow(headers)
+            with open(self.csv_path, 'a', newline='', encoding='utf-8-sig') as f:
+                writer = csv.writer(f)
 
-            writer.writerow(row)
+                if not file_exists:
+                    headers = [
+                        'ユーザーの質問',
+                        '検索結果',
+                        'テーブル選択結果',
+                        '生成されたSQLクエリ',
+                        'タイムスタンプ'
+                    ]
+                    if expected_table is not None:
+                        headers.extend(['期待されるテーブル', 'テーブル選択の正誤'])
+                    writer.writerow(headers)
+
+                writer.writerow(row)
+
+        except Exception as e:
+            print(f"Error in log_query: {str(e)}")
+            # Continue execution even if logging fails
 
 def main():
     """
